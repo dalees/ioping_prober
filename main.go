@@ -16,14 +16,10 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/go-ping/ping"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -37,33 +33,33 @@ var (
 	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
 )
 
-type hostList []string
+type targetList []string
 
-func (h *hostList) Set(value string) error {
+func (h *targetList) Set(value string) error {
 	if value == "" {
-		return fmt.Errorf("'%s' is not valid hostname", value)
+		return fmt.Errorf("'%s' is not valid directory|file|device", value)
 	} else {
 		*h = append(*h, value)
 		return nil
 	}
 }
 
-func (h *hostList) String() string {
+func (h *targetList) String() string {
 	return ""
 }
 
-func (h *hostList) IsCumulative() bool {
+func (h *targetList) IsCumulative() bool {
 	return true
 }
 
-func HostList(s kingpin.Settings) (target *[]string) {
+func TargetList(s kingpin.Settings) (target *[]string) {
 	target = new([]string)
-	s.SetValue((*hostList)(target))
+	s.SetValue((*targetList)(target))
 	return
 }
 
 func init() {
-	prometheus.MustRegister(version.NewCollector("smokeping_prober"))
+	prometheus.MustRegister(version.NewCollector("ioping_prober"))
 }
 
 func parseBuckets(buckets string) ([]float64, error) {
@@ -84,18 +80,18 @@ func main() {
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
-		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
-		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
-		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
+		buckets = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
+		//interval = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("5s").Duration()
+		//writemode = kingpin.Flag("write", "Write to target. Uses ioping -WWW and is destructive - read ioping manpage.").Default("false").Bool()
+		targets = TargetList(kingpin.Arg("target", "List of target directory/file/device to ioping").Required())
 	)
 
 	log.AddFlags(kingpin.CommandLine)
-	kingpin.Version(version.Print("smokeping_prober"))
+	kingpin.Version(version.Print("ioping_prober"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	log.Infoln("Starting smokeping_prober", version.Info())
+	log.Infoln("Starting ioping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
@@ -105,42 +101,42 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*ping.Pinger, len(*hosts))
-	for i, host := range *hosts {
-		pinger := ping.New(host)
-
-		err := pinger.Resolve()
-		if err != nil {
-			log.Errorf("failed to resolve pinger: %s\n", err.Error())
-			return
-		}
-
-		log.Infof("Resolved %s as %s", host, pinger.IPAddr())
-
-		pinger.Interval = *interval
-		pinger.Timeout = time.Duration(math.MaxInt64)
-		pinger.RecordRtts = false
-		pinger.SetPrivileged(*privileged)
-
+	pingers := make([]*Iopinger, len(*targets))
+	for i, target := range *targets {
+		pinger := NewIopinger(target)
+		//
+		//	//		err := pinger.Resolve()
+		//	//		if err != nil {
+		//	//			log.Errorf("failed to resolve pinger: %s\n", err.Error())
+		//	//			return
+		//	//		}
+		//
+		//	pinger.Interval = *interval
+		//	pinger.Timeout = time.Duration(math.MaxInt64)
+		//	pinger.SetFlags(["-Y"]) // Set O_SYNC
+		//	//pinger.SetWriteMode(*writemode) (implement as separate pinger? Or the same?)
+		//
 		pingers[i] = pinger
 	}
 
-	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
-	log.Infof("Waiting %s between starting pingers", splay)
-	for _, pinger := range pingers {
-		log.Infof("Starting prober for %s", pinger.Addr())
-		go pinger.Run()
-		time.Sleep(splay)
-	}
+	//splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
+	//log.Infof("Waiting %s between starting pingers", splay)
+	//for i, pinger := range pingers {
+	//	log.Infof("Starting prober for %s", pinger.Addr())
+	//	go pinger.Run()
+	//	if i < len(pingers)-1 {
+	//		time.Sleep(splay)
+	//	}
+	//}
 
-	prometheus.MustRegister(NewSmokepingCollector(&pingers, *pingResponseSeconds))
+	prometheus.MustRegister(NewIopingCollector(&pingers, *pingResponseSeconds))
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
-			<head><title>Smokeping Exporter</title></head>
+			<head><title>ioping Exporter</title></head>
 			<body>
-			<h1>Smokeping Exporter</h1>
+			<h1>ioping Exporter</h1>
 			<p><a href="` + *metricsPath + `">Metrics</a></p>
 			</body>
 			</html>`))

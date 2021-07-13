@@ -13,6 +13,6 @@
 
 DOCKER_ARCHS      ?= amd64 armv7 arm64
 DOCKER_REPO       ?= quay.io/superq
-DOCKER_IMAGE_NAME ?= smokeping-prober
+DOCKER_IMAGE_NAME ?= ioping-prober
 
 include Makefile.common
