@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	labelNames = []string{"target"}
+	labelNames = []string{"target", "mode"}
 
 	//pingResponseTtl = promauto.NewGaugeVec(
 	//	prometheus.GaugeOpts{
@@ -67,14 +67,15 @@ func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.His
 	for _, pinger := range *pingers {
 		// Init all metrics to 0s.
 		target := pinger.Target
-		pingResponseSeconds.WithLabelValues(target)
+		mode := pinger.Mode()
+		pingResponseSeconds.WithLabelValues(target, mode)
 
 		// Setup handler functions.
 		pinger.OnMeasure = func(stats *Statistics) {
 			measurement_nanosec := float64(stats.Max)
 			var nsec_to_sec float64 = 0.000000001
 			measurement_sec := measurement_nanosec * nsec_to_sec
-			pingResponseSeconds.WithLabelValues(stats.Target).Observe(measurement_sec)
+			pingResponseSeconds.WithLabelValues(stats.Target, stats.Mode).Observe(measurement_sec)
 			log.Debugf("Measurement time: %f sec (%f nanosec) of %s\n", measurement_sec, measurement_nanosec, stats.Target)
 		}
 		//pinger.OnFinish = func(stats *ping.Statistics) {
@@ -103,13 +104,12 @@ func (s *IopingCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *IopingCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, pinger := range *s.pingers {
-		//stats := pinger.Statistics()
-
 		ch <- prometheus.MustNewConstMetric(
 			s.requestsSent,
 			prometheus.CounterValue,
 			float64(pinger.Measurements),
 			pinger.Target,
+			pinger.Mode(),
 		)
 	}
 }

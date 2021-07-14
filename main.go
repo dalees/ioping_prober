@@ -82,10 +82,11 @@ func main() {
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-		buckets  = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
-		interval = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
-		//writemode = kingpin.Flag("write", "Write to target. Uses ioping -WWW and is destructive - read ioping manpage.").Default("false").Bool()
-		targets = TargetList(kingpin.Arg("target", "List of target directory/file/device to ioping").Required())
+		buckets         = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
+		interval        = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
+		writemode       = kingpin.Flag("write", "Write to target. Uses ioping -W and is safe for directory target.").Default("false").Bool()
+		unsafewritemode = kingpin.Flag("unsafewrite", "Unsafely write to target. Uses ioping -WWW and is destructive to file|device- read ioping manpage.").Default("false").Bool()
+		targets         = TargetList(kingpin.Arg("target", "List of target directory/file/device to ioping").Required())
 	)
 
 	log.AddFlags(kingpin.CommandLine)
@@ -103,22 +104,30 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*Iopinger, len(*targets))
+	num_targets := len(*targets)
+	num_pingers := num_targets
+	if *writemode || *unsafewritemode {
+		// Create an extra pinger per target for writes
+		num_pingers *= 2
+	}
+
+	pingers := make([]*Iopinger, num_pingers)
 	for i, target := range *targets {
+		// Create read mode pingers
 		pinger := NewIopinger(target)
-		//
-		//	//		err := pinger.Resolve()
-		//	//		if err != nil {
-		//	//			log.Errorf("failed to resolve pinger: %s\n", err.Error())
-		//	//			return
-		//	//		}
-		//
 		pinger.Interval = *interval
 		pinger.Timeout = time.Duration(math.MaxInt64)
-		//  pinger.SetFlags(["-Y"]) // Set O_SYNC
-		//	//pinger.SetWriteMode(*writemode) (implement as separate pinger? Or the same?)
-		//
 		pingers[i] = pinger
+
+		// create write mode pingers
+		if *writemode || *unsafewritemode {
+			pinger := NewIopinger(target)
+			pinger.Interval = *interval
+			pinger.Timeout = time.Duration(math.MaxInt64)
+			pinger.WriteMode = *writemode
+			pinger.UnsafeWriteMode = *unsafewritemode
+			pingers[num_targets+i] = pinger
+		}
 	}
 
 	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))

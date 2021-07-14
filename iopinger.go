@@ -12,9 +12,11 @@ import (
 
 func NewIopinger(target string) *Iopinger {
 	return &Iopinger{
-		Target:       target,
-		Interval:     time.Second,
-		Measurements: 0,
+		Target:          target,
+		Interval:        time.Second,
+		Measurements:    0,
+		WriteMode:       false,
+		UnsafeWriteMode: false,
 	}
 }
 
@@ -27,11 +29,26 @@ type Iopinger struct {
 	// Timeout for a single measurement operation (not yet implemented)
 	Timeout time.Duration
 
+	// If writemode is enabled. Allows writing to a target directory.
+	WriteMode bool
+
+	// If unsafe writemode is enabled. Allows shredding of target file/device.
+	UnsafeWriteMode bool
+
 	// Number of measurements performed
 	Measurements uint64
 
 	// Handler, called after each measurement
 	OnMeasure func(*Statistics)
+}
+
+// Gets the read/write mode
+func (p *Iopinger) Mode() string {
+	// Either write mode is on? We're writing.
+	if p.WriteMode || p.UnsafeWriteMode {
+		return "write"
+	}
+	return "read"
 }
 
 // Run runs the pinger. This is a blocking function that will run
@@ -55,7 +72,11 @@ func (p *Iopinger) Run() {
 	ioping_args := []string{"-warmup=0", "-interval=0ms", "-batch"}
 	ioping_args = append(ioping_args, "-count=1")
 	ioping_args = append(ioping_args, "-sync")
-	ioping_args = append(ioping_args, "-sync")
+	if p.UnsafeWriteMode {
+		ioping_args = append(ioping_args, "-WWW")
+	} else if p.WriteMode {
+		ioping_args = append(ioping_args, "-W")
+	}
 	ioping_args = append(ioping_args, p.Target)
 
 	for range interval.C {
@@ -72,6 +93,7 @@ func (p *Iopinger) Run() {
 
 		stats := Statistics{
 			Target: p.Target,
+			Mode:   p.Mode(),
 		}
 		stats.parseRawStatistics(out.String())
 
@@ -86,6 +108,7 @@ func (p *Iopinger) Run() {
 // Statistics represent the batch mode stats of a completed operation.
 type Statistics struct {
 	Target string
+	Mode   string
 
 	// dump_statistics: https://github.com/koct9i/ioping/blob/f549dffc224b3fcab10ad718dc243e1b0ba845f7/ioping.c#L1418
 	// struct def: https://github.com/koct9i/ioping/blob/f549dffc224b3fcab10ad718dc243e1b0ba845f7/ioping.c#L1341

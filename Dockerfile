@@ -1,3 +1,7 @@
+# Build latest ioping.
+# Build golang binary
+# Create final container image, COPY both.
+
 ARG ARCH="amd64"
 ARG OS="linux"
 FROM quay.io/prometheus/busybox-${OS}-${ARCH}:latest
