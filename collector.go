@@ -48,8 +48,8 @@ func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 	return prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "response_duration_seconds",
-			Help:      "A histogram of latencies for ping responses.",
+			Name:      "measurement_duration_seconds",
+			Help:      "A histogram of latencies for io responses.",
 			Buckets:   buckets,
 		},
 		labelNames,
@@ -71,10 +71,11 @@ func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.His
 
 		// Setup handler functions.
 		pinger.OnMeasure = func(stats *Statistics) {
-			measurement_value := float64(stats.Max)
-			pingResponseSeconds.WithLabelValues(stats.Target).Observe(measurement_value)
+			measurement_nanosec := float64(stats.Max)
 			var nsec_to_sec float64 = 0.000000001
-			log.Debugf("Measurement time: %f sec (%f nanosec) of %s\n", measurement_value*nsec_to_sec, measurement_value, stats.Target)
+			measurement_sec := measurement_nanosec * nsec_to_sec
+			pingResponseSeconds.WithLabelValues(stats.Target).Observe(measurement_sec)
+			log.Debugf("Measurement time: %f sec (%f nanosec) of %s\n", measurement_sec, measurement_nanosec, stats.Target)
 		}
 		//pinger.OnFinish = func(stats *ping.Statistics) {
 		//	log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
@@ -88,7 +89,7 @@ func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.His
 	return &IopingCollector{
 		pingers: pingers,
 		requestsSent: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "requests_total"),
+			prometheus.BuildFQName(namespace, "", "measurements_total"),
 			"Number of measurements performed",
 			labelNames,
 			nil,

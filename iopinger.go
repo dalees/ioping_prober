@@ -15,7 +15,6 @@ func NewIopinger(target string) *Iopinger {
 		Target:       target,
 		Interval:     time.Second,
 		Measurements: 0,
-		done:         make(chan interface{}),
 	}
 }
 
@@ -25,12 +24,11 @@ type Iopinger struct {
 	// Interval is the wait time between each packet send. Default is 1s.
 	Interval time.Duration
 
+	// Timeout for a single measurement operation (not yet implemented)
+	Timeout time.Duration
+
 	// Number of measurements performed
 	Measurements uint64
-
-	// Channel and mutex used to communicate when the Pinger should stop between goroutines.
-	done chan interface{}
-	//lock sync.Mutex
 
 	// Handler, called after each measurement
 	OnMeasure func(*Statistics)
@@ -43,7 +41,6 @@ func (p *Iopinger) Run() {
 	//timeout := time.NewTicker(p.Timeout)
 	interval := time.NewTicker(p.Interval)
 	defer func() {
-		p.Stop()
 		interval.Stop()
 		//timeout.Stop()
 	}()
@@ -54,20 +51,27 @@ func (p *Iopinger) Run() {
 	// '-a 0', so we can use '-c 1'
 	// otherwise need to use '-c 2 -i 0ms'
 	// TODO: Consider changing to '-c 10 -B -p 1'. Less exec overhead? Requires ignoring final summary line.
-	target := "/tmp"
+	ioping_path := "/usr/bin/ioping"
+	ioping_args := []string{"-warmup=0", "-interval=0ms", "-batch"}
+	ioping_args = append(ioping_args, "-count=1")
+	ioping_args = append(ioping_args, "-sync")
+	ioping_args = append(ioping_args, "-sync")
+	ioping_args = append(ioping_args, p.Target)
 
 	for range interval.C {
-		// "-sync"
-		cmd := exec.Command("/usr/bin/ioping", "-warmup=0", "-count=1", "-interval=0ms", string(target), "-batch")
-		var out bytes.Buffer
+		cmd := exec.Command(ioping_path, ioping_args...)
+		var out, serr bytes.Buffer
 		cmd.Stdout = &out
+		cmd.Stderr = &serr
 		err := cmd.Run()
 		if err != nil {
+			//log.Errorf("stderr: '%s'\n", serr.String())
 			log.Fatalf("cmd.Run() failed with '%s'\n", err)
 		}
+		p.Measurements++
 
 		stats := Statistics{
-			Target: target,
+			Target: p.Target,
 		}
 		stats.parseRawStatistics(out.String())
 
@@ -75,22 +79,9 @@ func (p *Iopinger) Run() {
 		if handler != nil {
 			handler(&stats)
 		}
-
-		//var ns_to_ms float64 = 0.000001
-		//fmt.Printf("Max time: %f ms\n", float64(stats.Max)*ns_to_ms)
-		//fmt.Printf("iops: %f\n", stats.Iops)
-		//fmt.Printf("Requests: %d\n", stats.Count)
 	}
 
 }
-
-func (p *Iopinger) Stop() {
-	//return
-}
-
-//func (s *Iopinger) Statistics() {
-//	return s
-//}
 
 // Statistics represent the batch mode stats of a completed operation.
 type Statistics struct {

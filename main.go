@@ -16,6 +16,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
@@ -113,7 +114,7 @@ func main() {
 		//	//		}
 		//
 		pinger.Interval = *interval
-		//	pinger.Timeout = time.Duration(math.MaxInt64)
+		pinger.Timeout = time.Duration(math.MaxInt64)
 		//  pinger.SetFlags(["-Y"]) // Set O_SYNC
 		//	//pinger.SetWriteMode(*writemode) (implement as separate pinger? Or the same?)
 		//
@@ -144,7 +145,7 @@ func main() {
 	})
 	log.Infof("Listening on %s", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
-	for _, pinger := range pingers {
-		pinger.Stop()
-	}
+	//for _, pinger := range pingers {
+	//		pinger.Stop()
+	//	}
 }
