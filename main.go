@@ -20,6 +20,7 @@ import (
 	_ "net/http/pprof"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -80,8 +81,8 @@ func main() {
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-		buckets = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
-		//interval = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("5s").Duration()
+		buckets  = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
+		interval = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("5s").Duration()
 		//writemode = kingpin.Flag("write", "Write to target. Uses ioping -WWW and is destructive - read ioping manpage.").Default("false").Bool()
 		targets = TargetList(kingpin.Arg("target", "List of target directory/file/device to ioping").Required())
 	)
@@ -111,23 +112,23 @@ func main() {
 		//	//			return
 		//	//		}
 		//
-		//	pinger.Interval = *interval
+		pinger.Interval = *interval
 		//	pinger.Timeout = time.Duration(math.MaxInt64)
-		//	pinger.SetFlags(["-Y"]) // Set O_SYNC
+		//  pinger.SetFlags(["-Y"]) // Set O_SYNC
 		//	//pinger.SetWriteMode(*writemode) (implement as separate pinger? Or the same?)
 		//
 		pingers[i] = pinger
 	}
 
-	//splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
-	//log.Infof("Waiting %s between starting pingers", splay)
-	//for i, pinger := range pingers {
-	//	log.Infof("Starting prober for %s", pinger.Addr())
-	//	go pinger.Run()
-	//	if i < len(pingers)-1 {
-	//		time.Sleep(splay)
-	//	}
-	//}
+	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
+	log.Infof("Waiting %s between starting pingers", splay)
+	for i, pinger := range pingers {
+		log.Infof("Starting prober for %s", pinger.Target)
+		go pinger.Run()
+		if i < len(pingers)-1 {
+			time.Sleep(splay)
+		}
+	}
 
 	prometheus.MustRegister(NewIopingCollector(&pingers, *pingResponseSeconds))
 

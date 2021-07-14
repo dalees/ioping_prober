@@ -17,6 +17,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/common/log"
 )
 
 const (
@@ -66,23 +67,16 @@ type IopingCollector struct {
 func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.HistogramVec) *IopingCollector {
 	for _, pinger := range *pingers {
 		// Init all metrics to 0s.
-		target := pinger.target
-		pingResponseDuplicates.WithLabelValues(target, "1")
+		target := pinger.Target
 		pingResponseSeconds.WithLabelValues(target, "1")
-		pingResponseTtl.WithLabelValues(target, "1")
 
 		// Setup handler functions.
-		//pinger.OnRecv = func(pkt *ping.Packet) {
-		//	pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-		//	pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
-		//	log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
-		//		pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
-		//}
-		//pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
-		//	pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Inc()
-		//	log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)\n",
-		//		pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
-		//}
+		pinger.OnMeasure = func(stats *Statistics) {
+			measurement_value := float64(stats.Max)
+			pingResponseSeconds.WithLabelValues(stats.Target).Observe(measurement_value)
+			var nsec_to_sec float64 = 0.000000001
+			log.Debugf("Measurement time: %f sec (%f nanosec)\n", measurement_value*nsec_to_sec, measurement_value)
+		}
 		//pinger.OnFinish = func(stats *ping.Statistics) {
 		//	log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
 		//	log.Debugf("%d packets transmitted, %d packets received, %v%% packet loss\n",
@@ -96,7 +90,7 @@ func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.His
 		pingers: pingers,
 		requestsSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "requests_total"),
-			"Number of ping requests sent",
+			"Number of measurements performed",
 			labelNames,
 			nil,
 		),
@@ -114,8 +108,8 @@ func (s *IopingCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(
 			s.requestsSent,
 			prometheus.CounterValue,
-			float64(pinger.PacketsSent),
-			pinger.target,
+			float64(pinger.Measurements),
+			pinger.Target,
 		)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"net"
 	"sync"
 	"time"
@@ -8,20 +9,30 @@ import (
 
 func NewIopinger(target string) *Iopinger {
 	return &Iopinger{
-		target:      target,
-		PacketsSent: 0,
+		Target:       target,
+		Interval:     time.Second,
+		Measurements: 0,
+		done:         make(chan interface{}),
 	}
 }
 
 type Iopinger struct {
-	target string
+	Target string
 
-	// Number of packets sent
-	PacketsSent int
+	// Interval is the wait time between each packet send. Default is 1s.
+	Interval time.Duration
+
+	// Number of measurements performed
+	Measurements uint64
+
+	// Channel and mutex used to communicate when the Pinger should stop between goroutines.
+	done chan interface{}
+	//lock sync.Mutex
 }
 
 func (s *Iopinger) Run() {
-	// Start pinging the host. This is a go run function
+	// Start pinging the host.
+	// This is a blocking function called as a goroutine
 	return
 }
 
@@ -33,6 +44,72 @@ func (s *Iopinger) Stop() {
 //	return s
 //}
 
+// Statistics represent the stats of a currently running or finished pinger operation.
+type Statistics struct {
+	// PacketsRecv is the number of packets received.
+	PacketsRecv int
+
+	// PacketsSent is the number of packets sent.
+	PacketsSent int
+
+	// PacketsRecvDuplicates is the number of duplicate responses there were to a sent packet.
+	PacketsRecvDuplicates int
+
+	// PacketLoss is the percentage of packets lost.
+	PacketLoss float64
+
+	// IPAddr is the address of the host being pinged.
+	IPAddr *net.IPAddr
+
+	// Addr is the string address of the host being pinged.
+	Addr string
+
+	// Rtts is all of the round-trip times sent via this pinger.
+	Rtts []time.Duration
+
+	// MinRtt is the minimum round-trip time sent via this pinger.
+	MinRtt time.Duration
+
+	// MaxRtt is the maximum round-trip time sent via this pinger.
+	MaxRtt time.Duration
+
+	// AvgRtt is the average round-trip time sent via this pinger.
+	AvgRtt time.Duration
+
+	// StdDevRtt is the standard deviation of the round-trip times sent via
+	// this pinger.
+	StdDevRtt time.Duration
+}
+
+func (p *Pinger) updateStatistics(pkt *Packet) {
+	p.statsMu.Lock()
+	defer p.statsMu.Unlock()
+
+	p.PacketsRecv++
+	if p.RecordRtts {
+		p.rtts = append(p.rtts, pkt.Rtt)
+	}
+
+	if p.PacketsRecv == 1 || pkt.Rtt < p.minRtt {
+		p.minRtt = pkt.Rtt
+	}
+
+	if pkt.Rtt > p.maxRtt {
+		p.maxRtt = pkt.Rtt
+	}
+
+	pktCount := time.Duration(p.PacketsRecv)
+	// welford's online method for stddev
+	// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+	delta := pkt.Rtt - p.avgRtt
+	p.avgRtt += delta / pktCount
+	delta2 := pkt.Rtt - p.avgRtt
+	p.stddevm2 += delta * delta2
+
+	p.stdDevRtt = time.Duration(math.Sqrt(float64(p.stddevm2 / pktCount)))
+}
+
+// Sample code: https://github.com/go-ping/ping/blob/master/ping.go
 type IopingerSample struct {
 	// Interval is the wait time between each packet send. Default is 1s.
 	Interval time.Duration
