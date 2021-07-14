@@ -82,7 +82,7 @@ func main() {
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
 		buckets  = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
-		interval = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("5s").Duration()
+		interval = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		//writemode = kingpin.Flag("write", "Write to target. Uses ioping -WWW and is destructive - read ioping manpage.").Default("false").Bool()
 		targets = TargetList(kingpin.Arg("target", "List of target directory/file/device to ioping").Required())
 	)

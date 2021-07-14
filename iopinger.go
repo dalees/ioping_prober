@@ -1,10 +1,13 @@
 package main
 
 import (
-	"math"
-	"net"
-	"sync"
+	"bytes"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/prometheus/common/log"
 )
 
 func NewIopinger(target string) *Iopinger {
@@ -28,171 +31,136 @@ type Iopinger struct {
 	// Channel and mutex used to communicate when the Pinger should stop between goroutines.
 	done chan interface{}
 	//lock sync.Mutex
+
+	// Handler, called after each measurement
+	OnMeasure func(*Statistics)
 }
 
-func (s *Iopinger) Run() {
+// Run runs the pinger. This is a blocking function that will run
+// continuously until interrupted.
+func (p *Iopinger) Run() {
 	// Start pinging the host.
-	// This is a blocking function called as a goroutine
-	return
+	//timeout := time.NewTicker(p.Timeout)
+	interval := time.NewTicker(p.Interval)
+	defer func() {
+		p.Stop()
+		interval.Stop()
+		//timeout.Stop()
+	}()
+
+	// TODO: validate that ioping is a version we're okay with.
+
+	// Require ioping with:
+	// '-a 0', so we can use '-c 1'
+	// otherwise need to use '-c 2 -i 0ms'
+	// TODO: Consider changing to '-c 10 -B -p 1'. Less exec overhead? Requires ignoring final summary line.
+	target := "/tmp"
+
+	for range interval.C {
+		// "-sync"
+		cmd := exec.Command("/usr/bin/ioping", "-warmup=0", "-count=1", "-interval=0ms", string(target), "-batch")
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		err := cmd.Run()
+		if err != nil {
+			log.Fatalf("cmd.Run() failed with '%s'\n", err)
+		}
+
+		stats := Statistics{
+			Target: target,
+		}
+		stats.parseRawStatistics(out.String())
+
+		handler := p.OnMeasure
+		if handler != nil {
+			handler(&stats)
+		}
+
+		//var ns_to_ms float64 = 0.000001
+		//fmt.Printf("Max time: %f ms\n", float64(stats.Max)*ns_to_ms)
+		//fmt.Printf("iops: %f\n", stats.Iops)
+		//fmt.Printf("Requests: %d\n", stats.Count)
+	}
+
 }
 
-func (s *Iopinger) Stop() {
-	return
+func (p *Iopinger) Stop() {
+	//return
 }
 
 //func (s *Iopinger) Statistics() {
 //	return s
 //}
 
-// Statistics represent the stats of a currently running or finished pinger operation.
+// Statistics represent the batch mode stats of a completed operation.
 type Statistics struct {
-	// PacketsRecv is the number of packets received.
-	PacketsRecv int
+	Target string
 
-	// PacketsSent is the number of packets sent.
-	PacketsSent int
+	// dump_statistics: https://github.com/koct9i/ioping/blob/f549dffc224b3fcab10ad718dc243e1b0ba845f7/ioping.c#L1418
+	// struct def: https://github.com/koct9i/ioping/blob/f549dffc224b3fcab10ad718dc243e1b0ba845f7/ioping.c#L1341
 
-	// PacketsRecvDuplicates is the number of duplicate responses there were to a sent packet.
-	PacketsRecvDuplicates int
+	//(0) count of requests in statistics
+	Valid uint64
 
-	// PacketLoss is the percentage of packets lost.
-	PacketLoss float64
+	//(1) running time         (nsec)
+	Sum float64
 
-	// IPAddr is the address of the host being pinged.
-	IPAddr *net.IPAddr
+	//(2) requests per second  (iops)
+	Iops float64
 
-	// Addr is the string address of the host being pinged.
-	Addr string
+	//(3) transfer speed       (bytes/sec)
+	Speed float64
 
-	// Rtts is all of the round-trip times sent via this pinger.
-	Rtts []time.Duration
+	//(4) minimal request time (nsec)
+	Min uint64
 
-	// MinRtt is the minimum round-trip time sent via this pinger.
-	MinRtt time.Duration
+	//(5) average request time (nsec)
+	Avg float64
 
-	// MaxRtt is the maximum round-trip time sent via this pinger.
-	MaxRtt time.Duration
+	//(6) maximum request time (nsec)
+	Max uint64
 
-	// AvgRtt is the average round-trip time sent via this pinger.
-	AvgRtt time.Duration
+	//(7) request time standard deviation (nsec)
+	Mdev float64
 
-	// StdDevRtt is the standard deviation of the round-trip times sent via
-	// this pinger.
-	StdDevRtt time.Duration
+	//(8) total requests       (including too slow and too fast)
+	Count uint64
+
+	//(9) total running time  (nsec)
+	Load_time uint64
 }
 
-func (p *Pinger) updateStatistics(pkt *Packet) {
-	p.statsMu.Lock()
-	defer p.statsMu.Unlock()
+func (stat *Statistics) parseRawStatistics(raw string) {
 
-	p.PacketsRecv++
-	if p.RecordRtts {
-		p.rtts = append(p.rtts, pkt.Rtt)
+	stats_raw := strings.Split(raw, " ")
+
+	valid_requests, err := strconv.ParseUint(stats_raw[0], 10, 64)
+	if err != nil {
+		log.Fatal(err)
 	}
+	stat.Valid = valid_requests
 
-	if p.PacketsRecv == 1 || pkt.Rtt < p.minRtt {
-		p.minRtt = pkt.Rtt
+	iops_value, err := strconv.ParseFloat(stats_raw[2], 64)
+	if err != nil {
+		log.Fatal(err)
 	}
+	stat.Iops = iops_value
 
-	if pkt.Rtt > p.maxRtt {
-		p.maxRtt = pkt.Rtt
+	bytespersec_value, err := strconv.ParseFloat(stats_raw[3], 64)
+	if err != nil {
+		log.Fatal(err)
 	}
+	stat.Speed = bytespersec_value
 
-	pktCount := time.Duration(p.PacketsRecv)
-	// welford's online method for stddev
-	// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
-	delta := pkt.Rtt - p.avgRtt
-	p.avgRtt += delta / pktCount
-	delta2 := pkt.Rtt - p.avgRtt
-	p.stddevm2 += delta * delta2
+	max_request_ns, err := strconv.ParseUint(stats_raw[6], 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	stat.Max = max_request_ns
 
-	p.stdDevRtt = time.Duration(math.Sqrt(float64(p.stddevm2 / pktCount)))
-}
-
-// Sample code: https://github.com/go-ping/ping/blob/master/ping.go
-type IopingerSample struct {
-	// Interval is the wait time between each packet send. Default is 1s.
-	Interval time.Duration
-
-	// Timeout specifies a timeout before ping exits, regardless of how many
-	// packets have been received.
-	Timeout time.Duration
-
-	// Count tells pinger to stop after sending (and receiving) Count echo
-	// packets. If this option is not specified, pinger will operate until
-	// interrupted.
-	Count int
-
-	// Debug runs in debug mode
-	Debug bool
-
-	// Number of packets sent
-	PacketsSent int
-
-	// Number of packets received
-	PacketsRecv int
-
-	// Number of duplicate packets received
-	PacketsRecvDuplicates int
-
-	// Round trip time statistics
-	minRtt    time.Duration
-	maxRtt    time.Duration
-	avgRtt    time.Duration
-	stdDevRtt time.Duration
-	stddevm2  time.Duration
-	statsMu   sync.RWMutex
-
-	// If true, keep a record of rtts of all received packets.
-	// Set to false to avoid memory bloat for long running pings.
-	RecordRtts bool
-
-	// rtts is all of the Rtts
-	rtts []time.Duration
-
-	// OnSetup is called when Pinger has finished setting up the listening socket
-	OnSetup func()
-
-	// OnSend is called when Pinger sends a packet
-	//OnSend func(*Packet)
-
-	// OnRecv is called when Pinger receives and processes a packet
-	//OnRecv func(*Packet)
-
-	// OnFinish is called when Pinger exits
-	//OnFinish func(*Statistics)
-
-	// OnDuplicateRecv is called when a packet is received that has already been received.
-	//OnDuplicateRecv func(*Packet)
-
-	// Size of packet being sent
-	Size int
-
-	// Tracker: Used to uniquely identify packets - Deprecated
-	Tracker uint64
-
-	// Source is the source IP address
-	Source string
-
-	// Channel and mutex used to communicate when the Pinger should stop between goroutines.
-	done chan interface{}
-	lock sync.Mutex
-
-	ipaddr *net.IPAddr
-	addr   string
-
-	// trackerUUIDs is the list of UUIDs being used for sending packets.
-	//trackerUUIDs []uuid.UUID
-
-	ipv4     bool
-	id       int
-	sequence int
-	// awaitingSequences are in-flight sequence numbers we keep track of to help remove duplicate receipts
-	//awaitingSequences map[uuid.UUID]map[int]struct{}
-	// network is one of "ip", "ip4", or "ip6".
-	network string
-	// protocol is "icmp" or "udp".
-	protocol string
-
-	//logger Logger
+	count_requests, err := strconv.ParseUint(stats_raw[8], 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	stat.Count = count_requests
 }

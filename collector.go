@@ -16,7 +16,6 @@ package main
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/common/log"
 )
 
@@ -25,24 +24,24 @@ const (
 )
 
 var (
-	labelNames = []string{"target", "target_size"}
+	labelNames = []string{"target"}
 
-	pingResponseTtl = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "response_ttl",
-			Help:      "The last response Time To Live (TTL).",
-		},
-		labelNames,
-	)
-	pingResponseDuplicates = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "response_duplicates_total",
-			Help:      "The number of duplicated response packets.",
-		},
-		labelNames,
-	)
+	//pingResponseTtl = promauto.NewGaugeVec(
+	//	prometheus.GaugeOpts{
+	//		Namespace: namespace,
+	//		Name:      "response_ttl",
+	//		Help:      "The last response Time To Live (TTL).",
+	//	},
+	//	labelNames,
+	//)
+	//pingResponseDuplicates = promauto.NewCounterVec(
+	//	prometheus.CounterOpts{
+	//		Namespace: namespace,
+	//		Name:      "response_duplicates_total",
+	//		Help:      "The number of duplicated response packets.",
+	//	},
+	//	labelNames,
+	//)
 )
 
 func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
@@ -68,14 +67,14 @@ func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.His
 	for _, pinger := range *pingers {
 		// Init all metrics to 0s.
 		target := pinger.Target
-		pingResponseSeconds.WithLabelValues(target, "1")
+		pingResponseSeconds.WithLabelValues(target)
 
 		// Setup handler functions.
 		pinger.OnMeasure = func(stats *Statistics) {
 			measurement_value := float64(stats.Max)
 			pingResponseSeconds.WithLabelValues(stats.Target).Observe(measurement_value)
 			var nsec_to_sec float64 = 0.000000001
-			log.Debugf("Measurement time: %f sec (%f nanosec)\n", measurement_value*nsec_to_sec, measurement_value)
+			log.Debugf("Measurement time: %f sec (%f nanosec) of %s\n", measurement_value*nsec_to_sec, measurement_value, stats.Target)
 		}
 		//pinger.OnFinish = func(stats *ping.Statistics) {
 		//	log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
