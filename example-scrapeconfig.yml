@@ -1,0 +1,11 @@
+
+- job_name: ioping_prober
+  honor_timestamps: true
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  metrics_path: /metrics
+  scheme: http
+  follow_redirects: true
+  static_configs:
+  - targets:
+    - 10.0.0.100:9374

@@ -14,7 +14,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "6.4.0"
+      "version": "8.0.6"
     },
     {
       "type": "panel",
@@ -46,9 +46,77 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1573496641574,
+  "iteration": 1685414665542,
   "links": [],
   "panels": [
+    {
+      "cards": {
+        "cardPadding": null,
+        "cardRound": null
+      },
+      "color": {
+        "cardColor": "#FADE2A",
+        "colorScale": "sqrt",
+        "colorScheme": "interpolateOranges",
+        "exponent": 0.5,
+        "mode": "opacity"
+      },
+      "dataFormat": "tsbuckets",
+      "datasource": "${DS_PROMETHEUS}",
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "heatmap": {},
+      "hideZeroBuckets": false,
+      "highlightCards": true,
+      "id": 4,
+      "interval": "30",
+      "legend": {
+        "show": true
+      },
+      "links": [],
+      "maxDataPoints": 100,
+      "repeat": "target",
+      "repeatDirection": "v",
+      "reverseYBuckets": false,
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "sum(increase(ioping_measurement_duration_seconds_bucket{target=\"$target\", mode=\"read\"}[$__interval])) by (le)",
+          "format": "heatmap",
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{le}}",
+          "refId": "A"
+        }
+      ],
+      "title": "$target, read",
+      "tooltip": {
+        "show": true,
+        "showHistogram": false
+      },
+      "type": "heatmap",
+      "xAxis": {
+        "show": true
+      },
+      "xBucketNumber": null,
+      "xBucketSize": null,
+      "yAxis": {
+        "decimals": 0,
+        "format": "s",
+        "logBase": 1,
+        "max": null,
+        "min": "0",
+        "show": true,
+        "splitFactor": null
+      },
+      "yBucketBound": "auto",
+      "yBucketNumber": null,
+      "yBucketSize": null
+    },
     {
       "cards": {
         "cardPadding": null,
@@ -64,31 +132,36 @@
       "dataFormat": "tsbuckets",
       "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
-        "h": 17,
-        "w": 24,
-        "x": 0,
+        "h": 12,
+        "w": 12,
+        "x": 12,
         "y": 0
       },
       "heatmap": {},
       "hideZeroBuckets": false,
       "highlightCards": true,
       "id": 2,
+      "interval": "30",
       "legend": {
-        "show": false
+        "show": true
       },
       "links": [],
-      "options": {},
+      "maxDataPoints": 100,
+      "repeat": "target",
+      "repeatDirection": "v",
       "reverseYBuckets": false,
       "targets": [
         {
-          "expr": "sum(rate(smokeping_response_duration_seconds_bucket{instance=~\"$prober\",host=\"$target\"}[5m])) by (le)",
+          "exemplar": true,
+          "expr": "sum(increase(ioping_measurement_duration_seconds_bucket{target=\"$target\", mode=\"write\"}[$__interval])) by (le)",
           "format": "heatmap",
+          "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{le}}",
           "refId": "A"
         }
       ],
-      "title": "Smokeping",
+      "title": "$target, write",
       "tooltip": {
         "show": true,
         "showHistogram": false
@@ -113,8 +186,8 @@
       "yBucketSize": null
     }
   ],
-  "refresh": "30s",
-  "schemaVersion": 20,
+  "refresh": false,
+  "schemaVersion": 30,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -123,42 +196,24 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "",
+        "definition": "label_values(ioping_measurement_duration_seconds_bucket, target)",
+        "description": null,
+        "error": null,
         "hide": 0,
-        "includeAll": false,
-        "label": null,
-        "multi": true,
-        "name": "prober",
-        "options": [],
-        "query": "label_values(smokeping_prober_build_info, instance)",
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
-      },
-      {
-        "allValue": null,
-        "current": {},
-        "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(smokeping_response_duration_seconds_bucket, host)",
-        "hide": 0,
-        "includeAll": false,
-        "label": null,
+        "includeAll": true,
+        "label": "Target",
         "multi": false,
         "name": "target",
         "options": [],
-        "query": "label_values(smokeping_response_duration_seconds_bucket, host)",
+        "query": {
+          "query": "label_values(ioping_measurement_duration_seconds_bucket, target)",
+          "refId": "StandardVariableQuery"
+        },
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "tagValuesQuery": "",
-        "tags": [],
         "tagsQuery": "",
         "type": "query",
         "useTags": false
@@ -166,7 +221,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {
@@ -195,7 +250,7 @@
     ]
   },
   "timezone": "",
-  "title": "Smokeping",
-  "uid": "i5aRaLaik",
-  "version": 11
+  "title": "ioping heatmaps",
+  "uid": "S7Lq3bW7z",
+  "version": 3
 }
