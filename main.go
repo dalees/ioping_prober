@@ -16,23 +16,31 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
+	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/promslog"
+	"github.com/prometheus/common/promslog/flag"
 	"github.com/prometheus/common/version"
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/prometheus/exporter-toolkit/web"
+	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 )
 
 var (
 	// Generated with: prometheus.ExponentialBuckets(0.00005, 2, 20)
 	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
+
+	logger *slog.Logger
 )
 
 type targetList []string
@@ -61,7 +69,7 @@ func TargetList(s kingpin.Settings) (target *[]string) {
 }
 
 func init() {
-	prometheus.MustRegister(version.NewCollector("ioping_prober"))
+	prometheus.MustRegister(versioncollector.NewCollector("ioping_prober"))
 }
 
 func parseBuckets(buckets string) ([]float64, error) {
@@ -79,8 +87,8 @@ func parseBuckets(buckets string) ([]float64, error) {
 
 func main() {
 	var (
-		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
-		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":9374")
 
 		buckets         = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval        = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
@@ -89,16 +97,18 @@ func main() {
 		targets         = TargetList(kingpin.Arg("target", "List of target directory/file/device to ioping").Required())
 	)
 
-	log.AddFlags(kingpin.CommandLine)
+	promslogConfig := &promslog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promslogConfig)
 	kingpin.Version(version.Print("ioping_prober"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
+	logger = promslog.New(promslogConfig)
 
-	log.Infoln("Starting ioping_prober", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	logger.Info("Starting ioping_prober", "version", version.Info())
+	logger.Info("Build context", "build_context", version.BuildContext())
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
-		log.Errorf("failed to parse buckets: %s\n", err.Error())
+		logger.Error("failed to parse buckets.", "err", err)
 		return
 	}
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
@@ -131,9 +141,9 @@ func main() {
 	}
 
 	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
-	log.Infof("Waiting %s between starting pingers", splay)
+	logger.Info("Waiting between starting pingers", "wait_time", splay)
 	for i, pinger := range pingers {
-		log.Infof("Starting prober for %s", pinger.Target)
+		logger.Info("Starting prober", "probe_target", pinger.Target)
 		go pinger.Run()
 		if i < len(pingers)-1 {
 			time.Sleep(splay)
@@ -152,8 +162,11 @@ func main() {
 			</body>
 			</html>`))
 	})
-	log.Infof("Listening on %s", *listenAddress)
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	server := &http.Server{}
+	if err := web.ListenAndServe(server, webConfig, logger); err != nil {
+		logger.Error("Failed to run web server", "err", err)
+		os.Exit(1)
+	}
 	//for _, pinger := range pingers {
 	//		pinger.Stop()
 	//	}

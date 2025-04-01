@@ -16,7 +16,6 @@ package main
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/log"
 )
 
 const (
@@ -76,7 +75,7 @@ func NewIopingCollector(pingers *[]*Iopinger, pingResponseSeconds prometheus.His
 			var nsec_to_sec float64 = 0.000000001
 			measurement_sec := measurement_nanosec * nsec_to_sec
 			pingResponseSeconds.WithLabelValues(stats.Target, stats.Mode).Observe(measurement_sec)
-			log.Debugf("Measurement time: %f sec (%f nanosec) of %s\n", measurement_sec, measurement_nanosec, stats.Target)
+			logger.Debug("Measurement time", "measurement_sec", measurement_sec, "measurement_nanosec", measurement_nanosec, "target", stats.Target)
 		}
 		//pinger.OnFinish = func(stats *ping.Statistics) {
 		//	log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
