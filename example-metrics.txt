@@ -1,0 +1,52 @@
+# HELP ioping_measurement_duration_seconds A histogram of latencies for io responses.
+# TYPE ioping_measurement_duration_seconds histogram
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="5e-05"} 0
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0001"} 13
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0002"} 69
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0004"} 83
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0008"} 88
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0016"} 91
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0032"} 243
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0064"} 260
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0128"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0256"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.0512"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.1024"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.2048"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.4096"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="0.8192"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="1.6384"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="3.2768"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="6.5536"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="13.1072"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="26.2144"} 261
+ioping_measurement_duration_seconds_bucket{mode="read",target="/tmp",le="+Inf"} 261
+ioping_measurement_duration_seconds_sum{mode="read",target="/tmp"} 0.4726246079999999
+ioping_measurement_duration_seconds_count{mode="read",target="/tmp"} 261
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="5e-05"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0001"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0002"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0004"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0008"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0016"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0032"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0064"} 0
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0128"} 66
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0256"} 259
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.0512"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.1024"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.2048"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.4096"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="0.8192"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="1.6384"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="3.2768"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="6.5536"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="13.1072"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="26.2144"} 260
+ioping_measurement_duration_seconds_bucket{mode="write",target="/tmp",le="+Inf"} 260
+ioping_measurement_duration_seconds_sum{mode="write",target="/tmp"} 3.669194006999999
+ioping_measurement_duration_seconds_count{mode="write",target="/tmp"} 260
+# HELP ioping_measurements_total Number of measurements performed
+# TYPE ioping_measurements_total counter
+ioping_measurements_total{mode="read",target="/tmp"} 261
+ioping_measurements_total{mode="write",target="/tmp"} 260

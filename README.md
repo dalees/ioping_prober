@@ -89,6 +89,8 @@ With the exporter running, Prometheus can be configured to [scrape the exporter 
  ioping\_measurements\_total            | Counter    | Counter of iopings made.
  ioping\_measurement\_duration\_seconds | Histogram  | Filesystem response duration.
 
+An example in Prometheus exposition format is available in [example-metrics.txt](example-metrics.txt).
+
 ## Grafana Dashboard
 
 A Grafana dashboard is available in [example-dashboard.json](example-dashboard.json) that presents the above metrics in a heatmap.
