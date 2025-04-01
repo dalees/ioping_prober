@@ -1,8 +1,8 @@
 go:
   # This must match .circle/config.yml.
-  version: 1.16
+  version: 1.22
 repository:
-  path: github.com/superq/smokeping_prober
+  path: github.com/dalees/ioping_prober
 build:
   flags: -a -tags 'netgo static_build'
   ldflags: |
