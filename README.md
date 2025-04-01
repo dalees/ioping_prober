@@ -46,13 +46,21 @@ go get github.com/dalees/ioping_prober
 ```
 
 Running the exporter is best suited for a VM with dedicated disks attached. Do not use `--unsafewrite` without using volumes that are dedicated to this test. In the example we have attached two ceph volumes, one spinning rust and one nvme. The differences can be seen on the example graph.
+
 ```
 ./ioping_prober --ping.interval=1s --log.level=debug /dev/vdb /dev/vdc --unsafewrite
 ```
 
 ## Metrics Exported
 
+With the exporter running, Prometheus can be configured to [scrape the exporter target](example-scrapeconfig.yml) and ingest the current metrics.
+
+
  Metric Name                            | Type       | Description
 ----------------------------------------|------------|-------------------------------------------
  ioping\_measurements\_total            | Counter    | Counter of iopings made.
  ioping\_measurement\_duration\_seconds | Histogram  | Filesystem response duration.
+
+## Dashboard
+
+A Grafana dashboard is available in [example-dashboard.json](example-dashboard.json) that presents the above metrics in a heatmap.
