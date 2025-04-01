@@ -88,7 +88,7 @@ func parseBuckets(buckets string) ([]float64, error) {
 func main() {
 	var (
 		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
-		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":9374")
+		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":10033")
 
 		buckets         = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval        = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()

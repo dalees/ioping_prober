@@ -21,5 +21,5 @@ RUN apt-get update && \
 
 COPY --from=builder /ioping_prober /bin/ioping_prober
 
-EXPOSE 9374
+EXPOSE 10033
 ENTRYPOINT  [ "/bin/ioping_prober" ]
